@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class PrediccionSecuencial {
-    private static final int NUM_PARCELAS = 20;
+    private static final int NUM_PARCELAS = 100;
 
     public static void main(String[] args) {
         double[][] datosList = new double[NUM_PARCELAS][];
