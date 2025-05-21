@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class PrediccionForkJoin {
+    private static final int NUM_PARCELAS = 20;
+
     static class TareaPrediccion extends RecursiveTask<String> {
         int id;
         double[] datos;
@@ -32,10 +34,15 @@ public class PrediccionForkJoin {
         ForkJoinPool pool = new ForkJoinPool();
         List<TareaPrediccion> tareas = new ArrayList<>();
 
+        List<double[]> datosList = new ArrayList<>();
+        for (int i = 1; i <= NUM_PARCELAS; i++) {
+            datosList.add(PrediccionSecuencial.generarDatos());
+        }
+
         long start = System.currentTimeMillis();
 
-        for (int i = 1; i <= 20; i++) {
-            double[] datos = PrediccionSecuencial.generarDatos();
+        for (int i = 1; i <= NUM_PARCELAS; i++) {
+            double[] datos = datosList.get(i - 1);
             tareas.add(new TareaPrediccion(i, datos));
         }
 

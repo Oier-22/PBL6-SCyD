@@ -8,15 +8,21 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class PrediccionExecutor {
+    private static final int NUM_PARCELAS = 20;
     public static void main(String[] args) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(4);
         List<Future<String>> resultados = new ArrayList<>();
 
+        List<double[]> datosList = new ArrayList<>();
+        for (int i = 1; i <= NUM_PARCELAS; i++) {
+            datosList.add(PrediccionSecuencial.generarDatos());
+        }
+
         long start = System.currentTimeMillis();
 
-        for (int i = 1; i <= 20; i++) {
+        for (int i = 1; i <= NUM_PARCELAS; i++) {
             final int id = i;
-            final double[] datos = PrediccionSecuencial.generarDatos();
+            final double[] datos = datosList.get(i - 1);
 
             resultados.add(executor.submit(() -> {
                 try {
