@@ -13,18 +13,18 @@ public class Main {
             datosList.add(PrediccionSecuencial.generarDatos());
         }
 
-        // // Secuencial
-        // long startSec = System.currentTimeMillis();
-        // for (int i = 0; i < NUM_PARCELAS; i++) {
-        //     try {
-        //         double pred = common.PrediccionUtils.predecirConsumoIA(datosList.get(i));
-        //         System.out.println("[Secuencial] Parcela P" + (i + 1) + ": " + pred + " L/m²");
-        //     } catch (Exception e) {
-        //         System.out.println("[Secuencial] Parcela P" + (i + 1) + ": ERROR");
-        //     }
-        // }
-        // long endSec = System.currentTimeMillis();
-        // System.out.println("Tiempo total Secuencial: " + (endSec - startSec) + " ms\n");
+        // Secuencial
+        long startSec = System.currentTimeMillis();
+        for (int i = 0; i < NUM_PARCELAS; i++) {
+            try {
+                double pred = common.PrediccionUtils.predecirConsumoIA(datosList.get(i));
+                System.out.println("[Secuencial] Parcela P" + (i + 1) + ": " + pred + " L/m²");
+            } catch (Exception e) {
+                System.out.println("[Secuencial] Parcela P" + (i + 1) + ": ERROR");
+            }
+        }
+        long endSec = System.currentTimeMillis();
+        System.out.println("Tiempo total Secuencial: " + (endSec - startSec) + " ms\n");
 
         // ExecutorService
         long startExec = System.currentTimeMillis();
