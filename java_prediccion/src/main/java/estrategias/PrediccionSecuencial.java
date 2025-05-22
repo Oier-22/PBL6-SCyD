@@ -6,11 +6,18 @@ import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class PrediccionSecuencial {
+    private static final int NUM_PARCELAS = 100;
+
     public static void main(String[] args) {
+        double[][] datosList = new double[NUM_PARCELAS][];
+        for (int i = 0; i < NUM_PARCELAS; i++) {
+            datosList[i] = generarDatos();
+        }
+
         long start = System.currentTimeMillis();
 
-        for (int i = 1; i <= 20; i++) {
-            double[] datos = generarDatos();
+        for (int i = 1; i <= NUM_PARCELAS; i++) {
+            double[] datos = datosList[i - 1];
             try {
                 double pred = PrediccionUtils.predecirConsumoIA(datos);
                 System.out.println("Parcela P" + i + ": " + pred + " L/m²");

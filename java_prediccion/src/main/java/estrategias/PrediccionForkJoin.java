@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class PrediccionForkJoin {
+    private static final int NUM_PARCELAS = 100;
+
     static class TareaPrediccion extends RecursiveTask<String> {
         int id;
         double[] datos;
@@ -32,10 +34,15 @@ public class PrediccionForkJoin {
         ForkJoinPool pool = new ForkJoinPool();
         List<TareaPrediccion> tareas = new ArrayList<>();
 
+        List<double[]> datosList = new ArrayList<>();
+        for (int i = 1; i <= NUM_PARCELAS; i++) {
+            datosList.add(PrediccionSecuencial.generarDatos());
+        }
+
         long start = System.currentTimeMillis();
 
-        for (int i = 1; i <= 20; i++) {
-            double[] datos = PrediccionSecuencial.generarDatos();
+        for (int i = 1; i <= NUM_PARCELAS; i++) {
+            double[] datos = datosList.get(i - 1);
             tareas.add(new TareaPrediccion(i, datos));
         }
 
@@ -50,6 +57,28 @@ public class PrediccionForkJoin {
 
         long end = System.currentTimeMillis();
         System.out.println("Tiempo total: " + (end - start) + " ms");
+
+        pool.shutdown();
+    }
+
+    public static void runWithDatosList(List<double[]> datosList) {
+        ForkJoinPool pool = new ForkJoinPool();
+        List<TareaPrediccion> tareas = new ArrayList<>();
+        int numParcelas = datosList.size();
+
+        for (int i = 1; i <= numParcelas; i++) {
+            double[] datos = datosList.get(i - 1);
+            tareas.add(new TareaPrediccion(i, datos));
+        }
+
+        List<ForkJoinTask<String>> results = new ArrayList<>();
+        for (TareaPrediccion t : tareas) {
+            results.add(pool.submit(t));
+        }
+
+        for (ForkJoinTask<String> r : results) {
+            System.out.println("[ForkJoin] " + r.join());
+        }
 
         pool.shutdown();
     }
