@@ -32,7 +32,7 @@ public class Publisher {
             // Escuchar las respuestas antes de enviar
             String nombreColaRespuestas = channel.queueDeclare().getQueue();
             channel.queueBind(nombreColaRespuestas, RESPONSE_EXCHANGE_NAME, "");
-            channel.basicConsume(nombreColaRespuestas, true, new DefaultConsumer(channel) {
+            channel.basicConsume(nombreColaRespuestas, false, new DefaultConsumer(channel) {
                 @Override
                 public void handleDelivery(String consumerTag, Envelope envelope,
                                            AMQP.BasicProperties properties, byte[] body) throws IOException {
@@ -40,27 +40,31 @@ public class Publisher {
                     System.out.println(" [x] Respuesta recibida: " + response);
                 
                     try (java.sql.Connection dbConn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                        // Dividir la respuesta para extraer el ID y el consumo
-                        String[] partes = response.split("ID=");
+                        String[] partes = response.split(":");
                         if (partes.length == 2) {
-                            String id = partes[1].split(":")[0].trim(); // Obtener ID de la parcela
-                            double consumo = Double.parseDouble(partes[1].split(":")[1].trim()); // Obtener consumo
+                            String id = partes[0].trim();
+                            double consumo = Double.parseDouble(partes[1].trim());
                 
-                            // Actualizar la base de datos
-                            PreparedStatement stmt = dbConn.prepareStatement("UPDATE Parcela SET consumoAgua = ? WHERE id = ?");
+                            PreparedStatement stmt = dbConn.prepareStatement(
+                                "UPDATE Parcela SET consumoAgua = ? WHERE id = ?"
+                            );
                             stmt.setDouble(1, consumo);
                             stmt.setString(2, id);
                             stmt.executeUpdate();
                             stmt.close();
+                
+                            channel.basicAck(envelope.getDeliveryTag(), false);
                         } else {
                             System.out.println("Formato incorrecto en la respuesta: " + response);
                         }
-                    } catch (SQLException e) {
-                        e.printStackTrace();
+                
+                    } catch (Exception e) {
+                        e.printStackTrace(); 
                     }
                 
                     latch.countDown();
                 }
+                
                 
             });
 
@@ -128,7 +132,7 @@ public class Publisher {
     }
 
     public static void main(String[] args) throws TimeoutException, InterruptedException {
-        int numSubscribers = 2;
+        int numSubscribers = 1;
         Publisher publisher = new Publisher();
         publisher.enviarParcelas(numSubscribers);
     }

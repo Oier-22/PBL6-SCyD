@@ -1,14 +1,16 @@
 package com.example;
 
+import com.example.paralelizacion.PrediccionExecutor;
 import com.rabbitmq.client.*;
 import java.io.*;
 import java.util.List;
-import java.util.Random;
+import java.util.Locale;
+import java.util.ArrayList;
 import java.util.concurrent.TimeoutException;
 
 public class Subscriber2 {
-    private final static String EXCHANGE_NAME = "parcelas_direct";  // direct exchange
-    private final static String RESPONSE_EXCHANGE_NAME = "parcelas_response";  // direct exchange para respuestas
+    private final static String EXCHANGE_NAME = "parcelas_direct";
+    private final static String RESPONSE_EXCHANGE_NAME = "parcelas_response";
 
     public Subscriber2(String routingKey) {
         ConnectionFactory factory = new ConnectionFactory();
@@ -18,26 +20,20 @@ public class Subscriber2 {
     public void recibirParcelas(String routingKey) throws TimeoutException {
         try (Connection connection = new ConnectionFactory().newConnection();
              Channel channel = connection.createChannel()) {
-            // Declarar el exchange de tipo direct
+
             channel.exchangeDeclare(EXCHANGE_NAME, "direct");
             channel.exchangeDeclare(RESPONSE_EXCHANGE_NAME, "direct");
 
-            // Crear una cola exclusiva para este subscriber
             String nombreCola = channel.queueDeclare().getQueue();
-
-            // Vincular la cola al exchange con el routingKey específico
             channel.queueBind(nombreCola, EXCHANGE_NAME, routingKey);
 
             System.out.println(" [*] Esperando mensajes para " + routingKey + ". Para salir presione CTRL+C");
 
-            // Definir el consumidor
             MiConsumer consumer = new MiConsumer(channel, routingKey);
-            // Consumir los mensajes
             channel.basicConsume(nombreCola, true, consumer);
 
-            // Mantener el programa ejecutándose para esperar indefinidamente
             synchronized (this) {
-                wait();  // Espera indefinida hasta que se reciba una señal para continuar o finalizar
+                wait();
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -57,43 +53,82 @@ public class Subscriber2 {
         @Override
         public void handleDelivery(String consumerTag, Envelope envelope,
                                    AMQP.BasicProperties properties, byte[] body) throws IOException {
-        
             try {
                 List<Parcela> parcelas = Subscriber1.deserialize(body);
-                System.out.println("Parcelas deserializadas: " + parcelas);
-        
-                Random rand = new Random();
-        
-                // Responder individualmente por cada parcela
+
+                List<PrediccionExecutor.JsonConId> datosList = new ArrayList<>();
                 for (Parcela parcela : parcelas) {
-                    int resultado = rand.nextInt(100);
-                    String respuesta = "Resultado para parcela ID=" + parcela.getId() + ": " + resultado;
-                    channel.basicPublish(RESPONSE_EXCHANGE_NAME, "", null, respuesta.getBytes());
-                    System.out.println(" [x] Respuesta enviada: " + respuesta);
+                    String id = parcela.getId();
+                    String jsonData = generateJsonForParcela(parcela);
+                    System.out.println("[Subscriber1] Parcela ID: " + id);
+                    System.out.println("[Subscriber1] JSON generado: " + jsonData);
+                    datosList.add(new PrediccionExecutor.JsonConId(id, jsonData));
                 }
-        
+
+                PrediccionExecutor.runWithDatosList(datosList, channel);
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        
+
+        private int mapTipoPlantaToNumeric(String tipoPlanta) {
+            switch (tipoPlanta) {
+                case "Tomate": return 1;
+                case "Lechuga": return 2;
+                case "Pepino": return 3;
+                case "Zanahoria": return 4;
+                default: return 0;
+            }
+        }
+
+        private int mapEtapaCrecimientoToNumeric(String etapaCrecimiento) {
+            switch (etapaCrecimiento) {
+                case "Germinación": return 1;
+                case "Crecimiento": return 2;
+                case "Floración": return 3;
+                case "Madurez": return 4;
+                default: return 0;
+            }
+        }
+
+        private String generateJsonForParcela(Parcela parcela) {
+                return String.format(Locale.US,  // <---- clave aquí
+                "{" +
+                    "\"temp\": %.2f," +
+                    "\"humedad\": %.2f," +
+                    "\"viento\": %.2f," +
+                    "\"radiacion\": %.2f," +
+                    "\"precipitacion\": %.2f," +
+                    "\"tipo_planta\": %d," +
+                    "\"etapa_crecimiento\": %d," +
+                    "\"tipo_suelo\": %d," +
+                    "\"humedad_suelo\": %.2f," +
+                    "\"dia_del_ano\": %d" +
+                "}",
+                parcela.getTemperatura(),
+                parcela.getHumedad(),
+                parcela.getViento(),
+                parcela.getRadiacion(),
+                parcela.getPrecipitacion(),
+                mapTipoPlantaToNumeric(parcela.getTipoDePlanta()),
+                mapEtapaCrecimientoToNumeric(parcela.getEtapaCrecimiento()),
+                0,
+                parcela.getHumedadSuelo(),
+                parcela.getDiaDelAnio()
+            );        
+        }
     }
 
-    public static void main(String[] args) throws TimeoutException {
-        // Crear suscriptores con diferentes routing keys
-        Subscriber2 subscriber = new Subscriber2("subscriber2");
-        subscriber.recibirParcelas("subscriber2");
-
-        // Si quisieras agregar otro suscriptor, también lo harías aquí:
-        // Subscriber subscriber2 = new Subscriber("subscriber2");
-        // subscriber2.recibirParcelas("subscriber2");
-    }
-
-    // Función para deserializar el mensaje
     public static List<Parcela> deserialize(byte[] data) throws IOException, ClassNotFoundException {
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data);
              ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
             return (List<Parcela>) objectInputStream.readObject();
         }
+    }
+
+    public static void main(String[] args) throws TimeoutException {
+        Subscriber2 subscriber = new Subscriber2("subscriber2");
+        subscriber.recibirParcelas("subscriber2");
     }
 }
