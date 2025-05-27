@@ -1,0 +1,13 @@
+num_parcelas,estrategia,tiempo_ms
+20,Secuencial,52898
+20,ExecutorService,10191
+20,ForkJoin,9728
+50,Secuencial,137578
+50,ExecutorService,26792
+50,ForkJoin,25387
+100,Secuencial,267142
+100,ExecutorService,54746
+100,ForkJoin,51473
+200,Secuencial,540722
+200,ExecutorService,107713
+200,ForkJoin,108964
