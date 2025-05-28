@@ -41,8 +41,9 @@ public class PrediccionUtils {
 
             writer.write(inputJson);
         }
+        String scriptPath = "C:\\mondragon\\3. maila\\2 seihilekoa\\PBL6\\programa\\PBL6-SCyD\\modelo_ia\\predecir.py";
 
-        ProcessBuilder pb = new ProcessBuilder("python", "../modelo_ia/predecir.py", tempFile.getAbsolutePath());
+        ProcessBuilder pb = new ProcessBuilder("python", scriptPath, tempFile.getAbsolutePath());
         pb.redirectErrorStream(true);
         Process process = pb.start();
 

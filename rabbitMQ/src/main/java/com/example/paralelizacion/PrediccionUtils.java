@@ -11,7 +11,7 @@ public class PrediccionUtils {
         String scriptPath = "C:\\mondragon\\3. maila\\2 seihilekoa\\PBL6\\programa\\PBL6-SCyD\\modelo_ia\\predecir.py";
 
         try (FileWriter writer = new FileWriter(tempFile)) {
-            writer.write(jsonData);  // Escribir el JSON directamente
+            writer.write(jsonData);  
         }
 
         ProcessBuilder pb = new ProcessBuilder("python", scriptPath, tempFile.getAbsolutePath());

@@ -56,6 +56,7 @@ public class PrediccionForkJoin {
         }
 
         long end = System.currentTimeMillis();
+        System.out.println("ForkJoin:");
         System.out.println("Tiempo total: " + (end - start) + " ms");
 
         pool.shutdown();

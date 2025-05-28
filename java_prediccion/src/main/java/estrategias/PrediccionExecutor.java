@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class PrediccionExecutor {
-    private static final int NUM_PARCELAS = 100;
+    private static final int NUM_PARCELAS = 80;
     public static void main(String[] args) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(4);
         List<Future<String>> resultados = new ArrayList<>();
@@ -46,6 +46,7 @@ public class PrediccionExecutor {
         executor.awaitTermination(1, TimeUnit.MINUTES);
 
         long end = System.currentTimeMillis();
+        System.out.println("Executor service:");
         System.out.println("Tiempo total: " + (end - start) + " ms");
     }
 

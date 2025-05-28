@@ -15,12 +15,12 @@ public class PrediccionSecuencial {
         }
 
         long start = System.currentTimeMillis();
-
+        System.out.println("Sekuentzialki:");
         for (int i = 1; i <= NUM_PARCELAS; i++) {
             double[] datos = datosList[i - 1];
             try {
                 double pred = PrediccionUtils.predecirConsumoIA(datos);
-                System.out.println("Parcela P" + i + ": " + pred + " L/m²");
+                //System.out.println("Parcela P" + i + ": " + pred + " L/m²");
             } catch (IOException e) {
                 System.out.println("Parcela P" + i + ": ERROR");
             }
