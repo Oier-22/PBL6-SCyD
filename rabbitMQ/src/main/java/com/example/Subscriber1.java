@@ -40,7 +40,7 @@ public class Subscriber1 {
     
             System.out.println(" [*] Esperando mensajes para " + routingKey + ". Para salir presione CTRL+C");
     
-            MiConsumer consumer = new MiConsumer(channel, routingKey);
+            MiConsumer consumer = new MiConsumer(channel);
             channel.basicQos(1); 
             channel.basicConsume(nombreCola, false, consumer);
     
@@ -59,12 +59,10 @@ public class Subscriber1 {
 
     class MiConsumer extends DefaultConsumer {
         private final Channel channel;
-        private final String routingKey;
 
-        public MiConsumer(Channel channel, String routingKey) {
+        public MiConsumer(Channel channel) {
             super(channel);
             this.channel = channel;
-            this.routingKey = routingKey;
         }
 
         @Override

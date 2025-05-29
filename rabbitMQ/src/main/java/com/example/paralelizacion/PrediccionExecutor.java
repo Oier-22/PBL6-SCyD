@@ -11,6 +11,10 @@ import com.rabbitmq.client.Channel;
 
 public class PrediccionExecutor {
 
+    private PrediccionExecutor() {
+        
+    }
+
     public static class JsonConId {
         public final String id;
         public final String json;

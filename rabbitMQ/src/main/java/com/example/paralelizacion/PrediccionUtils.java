@@ -1,9 +1,12 @@
 package com.example.paralelizacion;
 
 import java.io.*;
-import java.util.Locale;
 
 public class PrediccionUtils {
+
+    private PrediccionUtils() {
+        
+    }
 
     public static double predecirConsumoIA(String jsonData) throws IOException {
         File tempFile = File.createTempFile("pred_input_", ".json");

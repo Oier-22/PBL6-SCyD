@@ -4,6 +4,8 @@ import com.rabbitmq.client.*;
 import com.rabbitmq.client.Connection;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -14,7 +16,7 @@ public class Publisher {
     private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
     private static final String DB_URL = "jdbc:mysql://localhost:3306/sistema_riego";
     private static final String DB_USER = "root";
-    private static final String DB_PASSWORD = "root";
+    private static String DB_PASSWORD;
     
 
     public void enviarParcelas(int numSubscribers, String host, String username, String password) 
@@ -135,7 +137,12 @@ public class Publisher {
     }
 
     public static void main(String[] args) throws Exception {
-    
+        InputStream input = Publisher.class.getResourceAsStream("/com/example/configuracion/config.txt");
+        if (input == null) {
+            throw new FileNotFoundException("Archivo config.txt no encontrado en classpath");
+        }
+        DB_PASSWORD = new String(input.readAllBytes()).trim();
+        System.out.println(DB_PASSWORD);
         int numSubscribers = 1;
         String host = "192.168.73.245";
         String username = "testuser";
