@@ -1,6 +1,7 @@
 package com.example.paralelizacion;
 
 import java.io.*;
+import java.util.Properties;
 
 public class PrediccionUtils {
 
@@ -10,8 +11,14 @@ public class PrediccionUtils {
 
     public static double predecirConsumoIA(String jsonData) throws IOException {
         File tempFile = File.createTempFile("pred_input_", ".json");
-        tempFile.deleteOnExit();
-        String scriptPath = "C:\\mondragon\\3. maila\\2 seihilekoa\\PBL6\\programa\\PBL6-SCyD\\modelo_ia\\predecir.py";
+        InputStream input = PrediccionUtils.class.getResourceAsStream("/config.txt");
+        if (input == null) {
+            throw new FileNotFoundException("Archivo config.txt no encontrado en resources");
+        }
+        Properties config = new Properties();
+        config.load(input);
+        String scriptPath = config.getProperty("scriptPath");
+        
 
         try (FileWriter writer = new FileWriter(tempFile)) {
             writer.write(jsonData);  

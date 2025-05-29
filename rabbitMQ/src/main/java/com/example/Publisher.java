@@ -4,19 +4,18 @@ import com.rabbitmq.client.*;
 import com.rabbitmq.client.Connection;
 
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
+import java.nio.charset.StandardCharsets;
 
 public class Publisher {
     private static final String EXCHANGE_NAME = "parcelas_direct";
     private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
     private static final String DB_URL = "jdbc:mysql://localhost:3306/sistema_riego";
     private static final String DB_USER = "root";
-    private static String DB_PASSWORD;
+    private static String dbPassword;
     
 
     public void enviarParcelas(int numSubscribers, String host, String username, String password) 
@@ -45,10 +44,10 @@ public class Publisher {
                 @Override
                 public void handleDelivery(String consumerTag, Envelope envelope,
                                         AMQP.BasicProperties properties, byte[] body) throws IOException {
-                    String response = new String(body, "UTF-8");
+                    String response = new String(body, StandardCharsets.UTF_8);
                     System.out.println(" [x] Respuesta recibida: " + response);
 
-                    try (java.sql.Connection dbConn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                    try (java.sql.Connection dbConn = DriverManager.getConnection(DB_URL, DB_USER, dbPassword)) {
                         String[] partes = response.split(":");
                         if (partes.length == 2) {
                             String id = partes[0].trim();
@@ -92,7 +91,7 @@ public class Publisher {
 
     public static List<Parcela> cargarParcelasDesdeDB() {
         List<Parcela> parcelas = new ArrayList<>();
-        try (java.sql.Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+        try (java.sql.Connection conn = DriverManager.getConnection(DB_URL, DB_USER, dbPassword);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT * FROM Parcela")) {
 
@@ -137,12 +136,12 @@ public class Publisher {
     }
 
     public static void main(String[] args) throws Exception {
-        InputStream input = Publisher.class.getResourceAsStream("/com/example/configuracion/config.txt");
-        if (input == null) {
-            throw new FileNotFoundException("Archivo config.txt no encontrado en classpath");
-        }
-        DB_PASSWORD = new String(input.readAllBytes()).trim();
-        System.out.println(DB_PASSWORD);
+        InputStream input = Publisher.class.getResourceAsStream("/config.txt");
+
+        Properties config = new Properties();
+        config.load(input);
+        dbPassword = config.getProperty("password");
+        System.out.println(dbPassword);
         int numSubscribers = 1;
         String host = "192.168.73.245";
         String username = "testuser";
