@@ -9,8 +9,9 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeoutException;
 
 public class Subscriber1 {
-    private final static String EXCHANGE_NAME = "parcelas_direct";
-    private final static String RESPONSE_EXCHANGE_NAME = "parcelas_response";
+    private static final String EXCHANGE_NAME = "parcelas_direct";
+    private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
+    
     private String host;
     private String username;
     private String password;
@@ -44,10 +45,13 @@ public class Subscriber1 {
             channel.basicConsume(nombreCola, false, consumer);
     
             synchronized (this) {
-                wait(); // Mantiene el programa vivo esperando mensajes
+                wait(); 
             }
     
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             e.printStackTrace();
         }
     }
@@ -80,6 +84,9 @@ public class Subscriber1 {
 
                 PrediccionExecutor.runWithDatosList(datosList, channel);
 
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); 
+                e.printStackTrace();
             } catch (Exception e) {
                 e.printStackTrace();
             }

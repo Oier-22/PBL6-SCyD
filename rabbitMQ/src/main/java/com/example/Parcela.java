@@ -13,7 +13,6 @@ public class Parcela implements Serializable {
     private String etapaCrecimiento;
     private double humedadSuelo;
     private int diaDelAnio;
-    private double consumoAgua;
 
     public Parcela(String id, double temperatura, double humedad, double viento, double radiacion, double precipitacion, 
                    String tipoDePlanta, String etapaCrecimiento, double humedadSuelo, int diaDelAnio) {

@@ -48,6 +48,9 @@ public class PrediccionExecutor {
         for (Future<String> f : resultados) {
             try {
                 System.out.println("[Executor] Resultado final: " + f.get());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.err.println("[Executor] Error interrumpido al obtener resultado.");
             } catch (Exception e) {
                 System.err.println("[Executor] Error obteniendo resultado: " + e.getMessage());
                 e.printStackTrace();

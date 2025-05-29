@@ -10,11 +10,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 
 public class Publisher {
-    private final static String EXCHANGE_NAME = "parcelas_direct";
-    private final static String RESPONSE_EXCHANGE_NAME = "parcelas_response";
-    private final static String DB_URL = "jdbc:mysql://localhost:3306/sistema_riego";
-    private final static String DB_USER = "root";
-    private final static String DB_PASSWORD = "root";
+    private static final String EXCHANGE_NAME = "parcelas_direct";
+    private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/sistema_riego";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "root";
+    
 
     public void enviarParcelas(int numSubscribers, String host, String username, String password) 
     throws TimeoutException, InterruptedException {
@@ -50,23 +51,22 @@ public class Publisher {
                         if (partes.length == 2) {
                             String id = partes[0].trim();
                             double consumo = Double.parseDouble(partes[1].trim());
-
-                            PreparedStatement stmt = dbConn.prepareStatement(
-                                "UPDATE Parcela SET consumoAgua = ? WHERE id = ?"
-                            );
-                            stmt.setDouble(1, consumo);
-                            stmt.setString(2, id);
-                            stmt.executeUpdate();
-                            stmt.close();
-
+                    
+                            try (PreparedStatement stmt = dbConn.prepareStatement(
+                                    "UPDATE Parcela SET consumoAgua = ? WHERE id = ?")) {
+                                stmt.setDouble(1, consumo);
+                                stmt.setString(2, id);
+                                stmt.executeUpdate();
+                            }
+                    
                             channel.basicAck(envelope.getDeliveryTag(), false);
                         } else {
                             System.out.println("Formato incorrecto en la respuesta: " + response);
                         }
-
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
+                    
 
                     latch.countDown();
                 }
