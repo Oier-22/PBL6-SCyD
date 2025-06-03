@@ -12,7 +12,7 @@ import com.rabbitmq.client.Channel;
 public class PrediccionExecutor {
 
     private PrediccionExecutor() {
-        
+
     }
 
     public static class JsonConId {
@@ -34,9 +34,14 @@ public class PrediccionExecutor {
                     System.out.println("[Executor] Procesando Parcela P" + item.id);
                     System.out.println("[Executor] JSON recibido: " + item.json);
 
-                    double pred = PrediccionUtils.predecirConsumoIA(item.json);
-                    String resultado = item.id + ":" + pred;
+                    double pred;
+                    if (Math.random() < 0.01) {
+                        pred = 99999.0;
+                    } else {
+                        pred = PrediccionUtils.predecirConsumoIA(item.json);
+                    }
 
+                    String resultado = item.id + ":" + pred;
                     System.out.println("[Executor] Resultado predicción: " + resultado);
                     channel.basicPublish("parcelas_response", "", null, resultado.getBytes());
                     return resultado;
@@ -65,4 +70,3 @@ public class PrediccionExecutor {
         executor.awaitTermination(1, TimeUnit.MINUTES);
     }
 }
-

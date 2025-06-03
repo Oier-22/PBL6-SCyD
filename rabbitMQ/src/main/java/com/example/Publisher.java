@@ -6,20 +6,24 @@ import com.rabbitmq.client.Connection;
 import java.io.*;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.nio.charset.StandardCharsets;
 
 public class Publisher {
     private static final String EXCHANGE_NAME = "parcelas_direct";
     private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
+    private static final String POST_ANALYSIS_EXCHANGE = "post_prediccion_x";
+    private static String dbPassword = "root";
     private static final String DB_URL = "jdbc:mysql://localhost:3306/sistema_riego";
     private static final String DB_USER = "root";
-    private static String dbPassword;
-    
 
-    public void enviarParcelas(int numSubscribers, String host, String username, String password) 
-    throws TimeoutException, InterruptedException {
+    public void enviarParcelas(int numSubscribers, String host, String username, String password)
+        throws TimeoutException, InterruptedException {
 
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(host);
@@ -31,11 +35,23 @@ public class Publisher {
 
             channel.exchangeDeclare(EXCHANGE_NAME, BuiltinExchangeType.DIRECT);
             channel.exchangeDeclare(RESPONSE_EXCHANGE_NAME, BuiltinExchangeType.DIRECT);
-
+            channel.exchangeDeclare(POST_ANALYSIS_EXCHANGE, BuiltinExchangeType.DIRECT);
+            
             List<Parcela> parcelas = cargarParcelasDesdeDB();
             List<List<Parcela>> grupos = dividirParcelas(parcelas, numSubscribers);
 
-            CountDownLatch latch = new CountDownLatch(parcelas.size());
+            AtomicInteger respuestasRestantes = new AtomicInteger(parcelas.size());
+            final Object lock = new Object();
+
+            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+            Runnable timeoutTask = () -> {
+                System.out.println("⚠️ No se han recibido respuestas en los últimos 10 segundos. Posible fallo en el subscriber.");
+                synchronized (lock) {
+                    lock.notify();
+                }
+            };
+            final ScheduledFuture<?>[] timeoutFuture = new ScheduledFuture<?>[1];
+            timeoutFuture[0] = scheduler.schedule(timeoutTask, 10, TimeUnit.SECONDS);
 
             String nombreColaRespuestas = channel.queueDeclare().getQueue();
             channel.queueBind(nombreColaRespuestas, RESPONSE_EXCHANGE_NAME, "");
@@ -47,29 +63,69 @@ public class Publisher {
                     String response = new String(body, StandardCharsets.UTF_8);
                     System.out.println(" [x] Respuesta recibida: " + response);
 
+                    timeoutFuture[0].cancel(false);
+                    timeoutFuture[0] = scheduler.schedule(timeoutTask, 60, TimeUnit.SECONDS);
+
                     try (java.sql.Connection dbConn = DriverManager.getConnection(DB_URL, DB_USER, dbPassword)) {
                         String[] partes = response.split(":");
                         if (partes.length == 2) {
                             String id = partes[0].trim();
                             double consumo = Double.parseDouble(partes[1].trim());
-                    
+
+                            if (consumo == 99999.0) {
+                                System.out.println("⚠️ Valor anómalo detectado en parcela " + id);
+                                Optional<Parcela> parcelaReenviar = parcelas.stream()
+                                        .filter(p -> p.getId().equals(id))
+                                        .findFirst();
+                            
+                                if (parcelaReenviar.isPresent()) {
+                                    List<Parcela> listaReenvio = new ArrayList<>();
+                                    listaReenvio.add(parcelaReenviar.get());
+                                    byte[] mensaje = serialize(listaReenvio);
+                                    channel.basicPublish(EXCHANGE_NAME, "subscriber1", null, mensaje);
+                                    System.out.println("🔁 Parcela " + id + " reenviada para nuevo cálculo");
+                                } else {
+                                    System.out.println("❌ Parcela con ID " + id + " no encontrada para reenvío");
+                                    if (respuestasRestantes.decrementAndGet() == 0) {
+                                        synchronized (lock) {
+                                            lock.notify();
+                                        }
+                                    }
+                                }
+                            
+                                channel.basicAck(envelope.getDeliveryTag(), false);
+                                return;
+                            }   
+
                             try (PreparedStatement stmt = dbConn.prepareStatement(
                                     "UPDATE Parcela SET consumoAgua = ? WHERE id = ?")) {
                                 stmt.setDouble(1, consumo);
                                 stmt.setString(2, id);
                                 stmt.executeUpdate();
                             }
-                    
+
+                            if (consumo > 26) {
+                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, "alerta.inicio", null, response.getBytes());
+                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, "estabilidad.parcela", null, response.getBytes());
+                            } else {
+                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, "registro.normal", null, response.getBytes());
+                            }
+
                             channel.basicAck(envelope.getDeliveryTag(), false);
+
+                            if (respuestasRestantes.decrementAndGet() == 0) {
+                                synchronized (lock) {
+                                    lock.notify();
+                                }
+                            }
+
                         } else {
                             System.out.println("Formato incorrecto en la respuesta: " + response);
                         }
+
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                    
-
-                    latch.countDown();
                 }
             });
 
@@ -80,13 +136,25 @@ public class Publisher {
                 System.out.println(" [x] Enviado a " + routingKey + ": " + grupos.get(i));
             }
 
-            latch.await();
-            System.out.println(" [x] Todas las respuestas recibidas y almacenadas. Finalizando.");
+            synchronized (lock) {
+                lock.wait();
+            }
+
+            scheduler.shutdownNow();
+
+            if (respuestasRestantes.get() > 0) {
+                System.out.println("⚠️ No se completaron todas las respuestas. Quedaron pendientes: " + respuestasRestantes.get());
+            } else {
+                System.out.println("✅ Todas las respuestas recibidas y almacenadas.");
+            }
+
+            System.out.println(" [x] Finalizando.");
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
 
 
     public static List<Parcela> cargarParcelasDesdeDB() {
@@ -97,16 +165,16 @@ public class Publisher {
 
             while (rs.next()) {
                 parcelas.add(new Parcela(
-                    rs.getString("id"),
-                    rs.getDouble("temperatura"),
-                    rs.getDouble("humedad"),
-                    rs.getDouble("viento"),
-                    rs.getDouble("radiacion"),
-                    rs.getDouble("precipitacion"),
-                    rs.getString("tipoDePlanta"),
-                    rs.getString("etapaCrecimiento"),
-                    rs.getDouble("humedadSuelo"),
-                    rs.getInt("diaDelAnio")
+                        rs.getString("id"),
+                        rs.getDouble("temperatura"),
+                        rs.getDouble("humedad"),
+                        rs.getDouble("viento"),
+                        rs.getDouble("radiacion"),
+                        rs.getDouble("precipitacion"),
+                        rs.getString("tipoDePlanta"),
+                        rs.getString("etapaCrecimiento"),
+                        rs.getDouble("humedadSuelo"),
+                        rs.getInt("diaDelAnio")
                 ));
             }
 
@@ -141,13 +209,11 @@ public class Publisher {
         Properties config = new Properties();
         config.load(input);
         dbPassword = config.getProperty("password");
-        System.out.println(dbPassword);
         int numSubscribers = 1;
-        String host = "192.168.73.245";
+        String host = "localhost";
         String username = "testuser";
         String password = "testpassword";
-    
+
         new Publisher().enviarParcelas(numSubscribers, host, username, password);
     }
-    
 }

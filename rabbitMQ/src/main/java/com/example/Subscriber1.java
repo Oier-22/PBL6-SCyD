@@ -11,11 +11,10 @@ import java.util.concurrent.TimeoutException;
 public class Subscriber1 {
     private static final String EXCHANGE_NAME = "parcelas_direct";
     private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
-    
+
     private String host;
     private String username;
     private String password;
-
 
     public Subscriber1(String host, String username, String password) {
         this.host = host;
@@ -28,26 +27,26 @@ public class Subscriber1 {
         factory.setHost(host);
         factory.setUsername(username);
         factory.setPassword(password);
-    
+
         try (Connection connection = factory.newConnection();
              Channel channel = connection.createChannel()) {
-    
+
             channel.exchangeDeclare(EXCHANGE_NAME, "direct");
             channel.exchangeDeclare(RESPONSE_EXCHANGE_NAME, "direct");
-    
+
             String nombreCola = channel.queueDeclare().getQueue();
             channel.queueBind(nombreCola, EXCHANGE_NAME, routingKey);
-    
+
             System.out.println(" [*] Esperando mensajes para " + routingKey + ". Para salir presione CTRL+C");
-    
+
             MiConsumer consumer = new MiConsumer(channel);
-            channel.basicQos(1); 
+            channel.basicQos(1);
             channel.basicConsume(nombreCola, false, consumer);
-    
+
             synchronized (this) {
-                wait(); 
+                wait();
             }
-    
+
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -55,7 +54,6 @@ public class Subscriber1 {
             e.printStackTrace();
         }
     }
-    
 
     class MiConsumer extends DefaultConsumer {
         private final Channel channel;
@@ -82,8 +80,10 @@ public class Subscriber1 {
 
                 PrediccionExecutor.runWithDatosList(datosList, channel);
 
+                channel.basicAck(envelope.getDeliveryTag(), false);
+
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); 
+                Thread.currentThread().interrupt();
                 e.printStackTrace();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -111,30 +111,30 @@ public class Subscriber1 {
         }
 
         private String generateJsonForParcela(Parcela parcela) {
-                return String.format(Locale.US,  // <---- clave aquí
-                "{" +
-                    "\"temp\": %.2f," +
-                    "\"humedad\": %.2f," +
-                    "\"viento\": %.2f," +
-                    "\"radiacion\": %.2f," +
-                    "\"precipitacion\": %.2f," +
-                    "\"tipo_planta\": %d," +
-                    "\"etapa_crecimiento\": %d," +
-                    "\"tipo_suelo\": %d," +
-                    "\"humedad_suelo\": %.2f," +
-                    "\"dia_del_ano\": %d" +
-                "}",
-                parcela.getTemperatura(),
-                parcela.getHumedad(),
-                parcela.getViento(),
-                parcela.getRadiacion(),
-                parcela.getPrecipitacion(),
-                mapTipoPlantaToNumeric(parcela.getTipoDePlanta()),
-                mapEtapaCrecimientoToNumeric(parcela.getEtapaCrecimiento()),
-                0,
-                parcela.getHumedadSuelo(),
-                parcela.getDiaDelAnio()
-            );        
+            return String.format(Locale.US,
+                    "{" +
+                            "\"temp\": %.2f," +
+                            "\"humedad\": %.2f," +
+                            "\"viento\": %.2f," +
+                            "\"radiacion\": %.2f," +
+                            "\"precipitacion\": %.2f," +
+                            "\"tipo_planta\": %d," +
+                            "\"etapa_crecimiento\": %d," +
+                            "\"tipo_suelo\": %d," +
+                            "\"humedad_suelo\": %.2f," +
+                            "\"dia_del_ano\": %d" +
+                            "}",
+                    parcela.getTemperatura(),
+                    parcela.getHumedad(),
+                    parcela.getViento(),
+                    parcela.getRadiacion(),
+                    parcela.getPrecipitacion(),
+                    mapTipoPlantaToNumeric(parcela.getTipoDePlanta()),
+                    mapEtapaCrecimientoToNumeric(parcela.getEtapaCrecimiento()),
+                    0,
+                    parcela.getHumedadSuelo(),
+                    parcela.getDiaDelAnio()
+            );
         }
     }
 
@@ -147,10 +147,10 @@ public class Subscriber1 {
 
     public static void main(String[] args) throws TimeoutException {
         String routingKey = "subscriber1";
-        String host = "192.168.73.245";
+        String host = "localhost";
         String username = "testuser";
         String password = "testpassword";
-    
+
         Subscriber1 subscriber = new Subscriber1(host, username, password);
         subscriber.recibirParcelas(routingKey);
     }
