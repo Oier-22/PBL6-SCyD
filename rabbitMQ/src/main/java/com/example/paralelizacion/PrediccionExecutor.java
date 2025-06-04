@@ -1,5 +1,5 @@
 package com.example.paralelizacion;
-
+// IMPLEMENTAR TLS
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -34,8 +34,14 @@ public class PrediccionExecutor {
                     System.out.println("[Executor] Procesando Parcela P" + item.id);
                     System.out.println("[Executor] JSON recibido: " + item.json);
 
+                    if (Math.random() < 0.01) {
+                        System.out.println("[Executor] ⚠️ Simulando fallo: Parcela " + item.id + " no responderá.");
+                        return "No responde: " + item.id;
+                    }
+
                     double pred;
                     if (Math.random() < 0.01) {
+                        System.out.println("[Executor] ⚠️ Simulando valor anomalo");
                         pred = 99999.0;
                     } else {
                         pred = PrediccionUtils.predecirConsumoIA(item.json);

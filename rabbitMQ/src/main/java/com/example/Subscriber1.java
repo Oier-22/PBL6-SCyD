@@ -2,10 +2,14 @@ package com.example;
 
 import com.example.paralelizacion.PrediccionExecutor;
 import com.rabbitmq.client.*;
+import com.rabbitmq.client.Connection;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+
 import java.io.*;
-import java.util.List;
-import java.util.Locale;
-import java.util.ArrayList;
+import java.security.KeyStore;
+import java.util.*;
 import java.util.concurrent.TimeoutException;
 
 public class Subscriber1 {
@@ -28,29 +32,46 @@ public class Subscriber1 {
         factory.setUsername(username);
         factory.setPassword(password);
 
-        try (Connection connection = factory.newConnection();
-             Channel channel = connection.createChannel()) {
+        try {
+            // 🔐 Configurar conexión TLS
+            char[] truststorePassword = "changeit".toCharArray();
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            InputStream tsStream = Subscriber1.class.getClassLoader().getResourceAsStream("tls/truststore.jks");
+            trustStore.load(tsStream, truststorePassword);
+            
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
+            tmf.init(trustStore);
 
-            channel.exchangeDeclare(EXCHANGE_NAME, "direct");
-            channel.exchangeDeclare(RESPONSE_EXCHANGE_NAME, "direct");
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, tmf.getTrustManagers(), null);
 
-            String nombreCola = channel.queueDeclare().getQueue();
-            channel.queueBind(nombreCola, EXCHANGE_NAME, routingKey);
+            factory.setPort(5671); // Puerto TLS
+            factory.useSslProtocol(sslContext);
 
-            System.out.println(" [*] Esperando mensajes para " + routingKey + ". Para salir presione CTRL+C");
+            try (Connection connection = factory.newConnection();
+                 Channel channel = connection.createChannel()) {
 
-            MiConsumer consumer = new MiConsumer(channel);
-            channel.basicQos(1);
-            channel.basicConsume(nombreCola, false, consumer);
+                channel.exchangeDeclare(EXCHANGE_NAME, "direct");
+                channel.exchangeDeclare(RESPONSE_EXCHANGE_NAME, "direct");
 
-            synchronized (this) {
-                wait();
+                String nombreCola = channel.queueDeclare().getQueue();
+                channel.queueBind(nombreCola, EXCHANGE_NAME, routingKey);
+
+                System.out.println(" [*] Esperando mensajes para " + routingKey + ". Para salir presione CTRL+C");
+
+                MiConsumer consumer = new MiConsumer(channel);
+                channel.basicQos(1);
+                channel.basicConsume(nombreCola, false, consumer);
+
+                synchronized (this) {
+                    wait();
+                }
             }
 
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            System.err.println("❌ Error en la conexión TLS o configuración del TrustStore");
             e.printStackTrace();
         }
     }
@@ -77,7 +98,6 @@ public class Subscriber1 {
                     System.out.println("[Subscriber1] JSON generado: " + jsonData);
                     datosList.add(new PrediccionExecutor.JsonConId(id, jsonData));
                 }
-
                 PrediccionExecutor.runWithDatosList(datosList, channel);
 
                 channel.basicAck(envelope.getDeliveryTag(), false);
@@ -87,26 +107,6 @@ public class Subscriber1 {
                 e.printStackTrace();
             } catch (Exception e) {
                 e.printStackTrace();
-            }
-        }
-
-        private int mapTipoPlantaToNumeric(String tipoPlanta) {
-            switch (tipoPlanta) {
-                case "Tomate": return 1;
-                case "Lechuga": return 2;
-                case "Pepino": return 3;
-                case "Zanahoria": return 4;
-                default: return 0;
-            }
-        }
-
-        private int mapEtapaCrecimientoToNumeric(String etapaCrecimiento) {
-            switch (etapaCrecimiento) {
-                case "Germinación": return 1;
-                case "Crecimiento": return 2;
-                case "Floración": return 3;
-                case "Madurez": return 4;
-                default: return 0;
             }
         }
 
@@ -135,6 +135,26 @@ public class Subscriber1 {
                     parcela.getHumedadSuelo(),
                     parcela.getDiaDelAnio()
             );
+        }
+
+        private int mapTipoPlantaToNumeric(String tipoPlanta) {
+            switch (tipoPlanta) {
+                case "Tomate": return 1;
+                case "Lechuga": return 2;
+                case "Pepino": return 3;
+                case "Zanahoria": return 4;
+                default: return 0;
+            }
+        }
+
+        private int mapEtapaCrecimientoToNumeric(String etapaCrecimiento) {
+            switch (etapaCrecimiento) {
+                case "Germinación": return 1;
+                case "Crecimiento": return 2;
+                case "Floración": return 3;
+                case "Madurez": return 4;
+                default: return 0;
+            }
         }
     }
 

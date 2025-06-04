@@ -1,18 +1,40 @@
-// EstabilidadWorker.java - escucha estabilidad.parcela y simula un análisis con sleep
 package com.example;
 
 import com.rabbitmq.client.*;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 
 public class EstabilidadWorker {
-    private static final String EXCHANGE = "post_prediccion_x";
+    private static final String EXCHANGE = "post_prediccion";
     private static final String RESPONSE_KEY = "alerta.estabilidad";
 
     public static void main(String[] args) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost("192.168.73.245");
+        factory.setHost("localhost");
         factory.setUsername("testuser");
         factory.setPassword("testpassword");
+
+        char[] truststorePassword = "changeit".toCharArray();
+        KeyStore trustStore = KeyStore.getInstance("JKS");
+        
+        InputStream tsStream = EstabilidadWorker.class.getClassLoader().getResourceAsStream("tls/truststore.jks");
+        trustStore.load(tsStream, truststorePassword);
+        
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
+        tmf.init(trustStore);
+        
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(null, tmf.getTrustManagers(), null);
+        
+        factory.setPort(5671); // TLS
+        factory.useSslProtocol(sslContext);
+        
 
         Connection connection = factory.newConnection();
         Channel channel = connection.createChannel();
@@ -30,13 +52,14 @@ public class EstabilidadWorker {
                 String id = partes[0].trim();
                 System.out.println(" [Estabilidad] Analizando parcela " + id + "...");
                 try {
-                    Thread.sleep(10000); 
+                    Thread.sleep(10000);
                     System.out.println(" [Estabilidad] Análisis completo para parcela " + id + ".");
 
-                    String resultado = id + ": ESTABLE";
+                    String resultado = id + ": plan para ajustar";
                     channel.basicPublish(EXCHANGE, RESPONSE_KEY, null, resultado.getBytes());
 
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     e.printStackTrace();
                 }
             }
