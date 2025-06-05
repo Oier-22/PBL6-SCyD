@@ -5,14 +5,12 @@ import com.rabbitmq.client.*;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 
 public class EstabilidadWorker {
     private static final String EXCHANGE = "post_prediccion";
-    private static final String RESPONSE_KEY = "alerta.estabilidad";
 
     public static void main(String[] args) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
@@ -22,19 +20,18 @@ public class EstabilidadWorker {
 
         char[] truststorePassword = "changeit".toCharArray();
         KeyStore trustStore = KeyStore.getInstance("JKS");
-        
+
         InputStream tsStream = EstabilidadWorker.class.getClassLoader().getResourceAsStream("tls/truststore.jks");
         trustStore.load(tsStream, truststorePassword);
-        
+
         TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
         tmf.init(trustStore);
-        
+
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, tmf.getTrustManagers(), null);
-        
-        factory.setPort(5671); // TLS
+
+        factory.setPort(5671);
         factory.useSslProtocol(sslContext);
-        
 
         Connection connection = factory.newConnection();
         Channel channel = connection.createChannel();
@@ -48,26 +45,36 @@ public class EstabilidadWorker {
         DeliverCallback callback = (consumerTag, delivery) -> {
             String mensaje = new String(delivery.getBody(), StandardCharsets.UTF_8);
             String[] partes = mensaje.split(":");
-            if (partes.length == 2) {
+
+            if (partes.length == 3) {
                 String id = partes[0].trim();
-                System.out.println(" [Estabilidad] Analizando parcela " + id + "...");
+                String consumo = partes[1].trim(); // no se usa, pero se podría
+                String usuarioId = partes[2].trim();
+
+                System.out.println(" [Estabilidad] Analizando parcela " + id + " para usuario " + usuarioId + "...");
+
                 try {
                     Thread.sleep(10000);
-                    System.out.println(" [Estabilidad] Análisis completo para parcela " + id + ".");
 
                     String resultado = id + ": plan para ajustar";
-                    channel.basicPublish(EXCHANGE, RESPONSE_KEY, null, resultado.getBytes());
+                    String userRoutingKey = "alerta." + usuarioId;
+
+                    channel.basicPublish(EXCHANGE, userRoutingKey, null, resultado.getBytes(StandardCharsets.UTF_8));
+
+                    System.out.println(" [Estabilidad] Resultado enviado a " + userRoutingKey);
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     e.printStackTrace();
                 }
+            } else {
+                System.out.println("⚠️ Formato inesperado: " + mensaje);
             }
+
             channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
         };
 
         channel.basicConsume(queue, false, callback, consumerTag -> {});
-
         Thread.sleep(Long.MAX_VALUE);
     }
 }

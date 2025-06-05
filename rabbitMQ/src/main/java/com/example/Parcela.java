@@ -4,6 +4,7 @@ import java.io.Serializable;
 
 public class Parcela implements Serializable {
     private String id;
+    private String usuarioId; // Nuevo campo
     private double temperatura;
     private double humedad;
     private double viento;
@@ -14,9 +15,10 @@ public class Parcela implements Serializable {
     private double humedadSuelo;
     private int diaDelAnio;
 
-    public Parcela(String id, double temperatura, double humedad, double viento, double radiacion, double precipitacion, 
-                   String tipoDePlanta, String etapaCrecimiento, double humedadSuelo, int diaDelAnio) {
+    public Parcela(String id, String usuarioId, double temperatura, double humedad, double viento, double radiacion,
+                   double precipitacion, String tipoDePlanta, String etapaCrecimiento, double humedadSuelo, int diaDelAnio) {
         this.id = id;
+        this.usuarioId = usuarioId;
         this.temperatura = temperatura;
         this.humedad = humedad;
         this.viento = viento;
@@ -30,14 +32,16 @@ public class Parcela implements Serializable {
 
     @Override
     public String toString() {
-        return "Parcela{id='" + id + "', temperatura=" + temperatura + ", humedad=" + humedad + 
-               ", viento=" + viento + ", radiacion=" + radiacion + ", precipitacion=" + precipitacion + 
-               ", tipoDePlanta='" + tipoDePlanta + "', etapaCrecimiento='" + etapaCrecimiento + 
-               "', humedadSuelo=" + humedadSuelo + ", diaDelAnio=" + diaDelAnio + '}';
+        return "Parcela{id='" + id + "', usuarioId='" + usuarioId + "', temperatura=" + temperatura +
+               ", humedad=" + humedad + ", viento=" + viento + ", radiacion=" + radiacion +
+               ", precipitacion=" + precipitacion + ", tipoDePlanta='" + tipoDePlanta +
+               "', etapaCrecimiento='" + etapaCrecimiento + "', humedadSuelo=" + humedadSuelo +
+               ", diaDelAnio=" + diaDelAnio + '}';
     }
 
     // Getters y setters
     public String getId() { return id; }
+    public String getUsuarioId() { return usuarioId; }
     public double getTemperatura() { return temperatura; }
     public double getHumedad() { return humedad; }
     public double getViento() { return viento; }

@@ -83,7 +83,7 @@ public class Publisher {
             Runnable timeoutTask = new Runnable() {
                 @Override
                 public void run() {
-                    System.out.println("⚠️ No se han recibido respuestas en los últimos 60 segundos. Reintentando parcelas pendientes...");
+                    System.out.println("⚠️ No se han recibido respuestas en los últimos 120 segundos. Reintentando parcelas pendientes...");
                     boolean hayPendientes = false;
                     for (Parcela parcela : new ArrayList<>(pendientes.values())) {
                         String id = parcela.getId();
@@ -168,11 +168,11 @@ public class Publisher {
                                 stmt.executeUpdate();
                             }
 
-                            if (consumo > 26) {
-                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, "alerta.inicio", null, response.getBytes());
-                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, "estabilidad.parcela", null, response.getBytes());
-                            } else {
-                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, "registro.normal", null, response.getBytes());
+                            if (consumo > 23.5) {
+                                String userRoutingKey = "alerta." + parcela.getUsuarioId();
+                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, userRoutingKey, null, response.getBytes());
+                                String mensajeConUsuario = response + ":" + parcela.getUsuarioId();
+                                channel.basicPublish(POST_ANALYSIS_EXCHANGE, "estabilidad.parcela", null, mensajeConUsuario.getBytes(StandardCharsets.UTF_8));
                             }
 
                             pendientes.remove(id);
@@ -234,6 +234,7 @@ public class Publisher {
             while (rs.next()) {
                 parcelas.add(new Parcela(
                         rs.getString("id"),
+                        rs.getString("usuario_id"),
                         rs.getDouble("temperatura"),
                         rs.getDouble("humedad"),
                         rs.getDouble("viento"),
@@ -244,6 +245,7 @@ public class Publisher {
                         rs.getDouble("humedadSuelo"),
                         rs.getInt("diaDelAnio")
                 ));
+                
             }
 
         } catch (SQLException e) {
