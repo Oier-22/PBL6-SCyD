@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class PrediccionForkJoin {
-    private static final int NUM_PARCELAS = 100;
+    private static final int NUM_PARCELAS = 60;
 
     static class TareaPrediccion extends RecursiveTask<String> {
         int id;
@@ -31,7 +31,8 @@ public class PrediccionForkJoin {
     }
 
     public static void main(String[] args) {
-        ForkJoinPool pool = new ForkJoinPool();
+        int availableProcessors = Runtime.getRuntime().availableProcessors();
+        ForkJoinPool pool = new ForkJoinPool(availableProcessors);
         List<TareaPrediccion> tareas = new ArrayList<>();
 
         List<double[]> datosList = new ArrayList<>();
@@ -63,7 +64,8 @@ public class PrediccionForkJoin {
     }
 
     public static void runWithDatosList(List<double[]> datosList) {
-        ForkJoinPool pool = new ForkJoinPool();
+        int availableProcessors = Runtime.getRuntime().availableProcessors();
+        ForkJoinPool pool = new ForkJoinPool(availableProcessors);
         List<TareaPrediccion> tareas = new ArrayList<>();
         int numParcelas = datosList.size();
 

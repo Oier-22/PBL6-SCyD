@@ -8,9 +8,11 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class PrediccionExecutor {
-    private static final int NUM_PARCELAS = 80;
+    private static final int NUM_PARCELAS = 60;
+
     public static void main(String[] args) throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(4);
+        int availableProcessors = Runtime.getRuntime().availableProcessors();
+        ExecutorService executor = Executors.newFixedThreadPool(availableProcessors);
         List<Future<String>> resultados = new ArrayList<>();
 
         List<double[]> datosList = new ArrayList<>();
@@ -51,7 +53,8 @@ public class PrediccionExecutor {
     }
 
     public static void runWithDatosList(List<double[]> datosList) throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(12);
+        int availableProcessors = Runtime.getRuntime().availableProcessors();
+        ExecutorService executor = Executors.newFixedThreadPool(availableProcessors);
         List<Future<String>> resultados = new ArrayList<>();
         int numParcelas = datosList.size();
 
@@ -78,6 +81,6 @@ public class PrediccionExecutor {
         }
 
         executor.shutdown();
-        executor.awaitTermination(1, java.util.concurrent.TimeUnit.MINUTES);
+        executor.awaitTermination(1, TimeUnit.MINUTES);
     }
 }
