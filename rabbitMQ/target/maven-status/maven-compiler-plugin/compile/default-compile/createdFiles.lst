@@ -6,6 +6,7 @@ com\example\AlertaWorker.class
 com\example\paralelizacion\PrediccionExecutor$JsonConId.class
 com\example\paralelizacion\PrediccionExecutor.class
 com\example\Publisher$2.class
+com\example\ConfigLoader.class
 com\example\paralelizacion\PrediccionUtils.class
 com\example\Parcela.class
 com\example\Publisher$1.class

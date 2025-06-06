@@ -1,2 +1,0 @@
-password=root
-scriptPath=C:\\mondragon\\3. maila\\2 seihilekoa\\PBL6\\programa\\PBL6-SCyD\\modelo_ia\\predecir.py

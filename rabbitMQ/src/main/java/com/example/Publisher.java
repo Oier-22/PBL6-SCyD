@@ -27,36 +27,60 @@ public class Publisher {
     private static final String EXCHANGE_NAME = "parcelas_direct";
     private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
     private static final String POST_ANALYSIS_EXCHANGE = "post_prediccion";
-    private static String dbPassword = "root";
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/sistema_riego";
-    private static final String DB_USER = "root";
 
-    public void enviarParcelas(int numSubscribers, String host, String username, String password)
-        throws TimeoutException, InterruptedException, KeyStoreException, NoSuchAlgorithmException, CertificateException, FileNotFoundException, IOException, KeyManagementException {
+    private static final String DB_URL;
+    private static final String DB_USER;
+    private static final String DB_PASSWORD;
+    private static final String RABBIT_HOST;
+    private static final String RABBIT_USER;
+    private static final String RABBIT_PASS;
+    private static final int RABBIT_PORT;
+    private static final String TRUSTSTORE_PATH;
+    private static final char[] TRUSTSTORE_PASSWORD;
+
+    static {
+        Properties config = new Properties();
+        try (InputStream input = new FileInputStream("rabbitMQ/config/config.txt")) {
+            config.load(input);
+        } catch (IOException e) {
+            throw new RuntimeException("No se pudo cargar config.txt", e);
+        }
+
+        DB_URL = config.getProperty("db.url");
+        DB_USER = config.getProperty("db.user");
+        DB_PASSWORD = config.getProperty("db.password");
+        RABBIT_HOST = config.getProperty("rabbitmq.host");
+        RABBIT_USER = config.getProperty("rabbitmq.username");
+        RABBIT_PASS = config.getProperty("rabbitmq.password");
+        RABBIT_PORT = Integer.parseInt(config.getProperty("rabbitmq.port"));
+        TRUSTSTORE_PATH = config.getProperty("truststore.path");
+        TRUSTSTORE_PASSWORD = config.getProperty("truststore.password").toCharArray();
+    }
+
+    public void enviarParcelas(int numSubscribers)
+        throws TimeoutException, InterruptedException, KeyStoreException, NoSuchAlgorithmException,
+               CertificateException, IOException, KeyManagementException {
 
         ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost(host);
-        factory.setUsername(username);
-        factory.setPassword(password);
-        char[] truststorePassword = "changeit".toCharArray();
+        factory.setHost(RABBIT_HOST);
+        factory.setUsername(RABBIT_USER);
+        factory.setPassword(RABBIT_PASS);
+
         KeyStore trustStore = KeyStore.getInstance("JKS");
-        
-        InputStream tsStream = Publisher.class.getClassLoader().getResourceAsStream("tls/truststore.jks");
-        trustStore.load(tsStream, truststorePassword);
-        
+        InputStream tsStream = new FileInputStream(TRUSTSTORE_PATH);
+        trustStore.load(tsStream, TRUSTSTORE_PASSWORD);
+
         TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
         tmf.init(trustStore);
-        
+
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, tmf.getTrustManagers(), null);
-        
-        factory.setPort(5671); // Puerto TLS
-        factory.useSslProtocol(sslContext);
-        
 
+        factory.setPort(RABBIT_PORT);
+        factory.useSslProtocol(sslContext);
 
         try (Connection connection = factory.newConnection();
-            Channel channel = connection.createChannel()) {
+             Channel channel = connection.createChannel()) {
 
             channel.exchangeDeclare(EXCHANGE_NAME, BuiltinExchangeType.DIRECT);
             channel.exchangeDeclare(RESPONSE_EXCHANGE_NAME, BuiltinExchangeType.DIRECT);
@@ -83,7 +107,7 @@ public class Publisher {
             Runnable timeoutTask = new Runnable() {
                 @Override
                 public void run() {
-                    System.out.println("⚠️ No se han recibido respuestas en los últimos 120 segundos. Reintentando parcelas pendientes...");
+                    System.out.println("⚠️ Timeout de respuestas. Reintentando parcelas pendientes...");
                     boolean hayPendientes = false;
                     for (Parcela parcela : new ArrayList<>(pendientes.values())) {
                         String id = parcela.getId();
@@ -94,20 +118,19 @@ public class Publisher {
                                 byte[] mensaje = serialize(List.of(parcela));
                                 channel.basicPublish(EXCHANGE_NAME, routingKey, null, mensaje);
                                 intentosPorParcela.put(id, intentos + 1);
-                                System.out.println("🔁 Reintentando parcela " + id + " (intento " + (intentos + 1) + ")");
+                                System.out.println("🔁 Reintentando parcela " + id + " (" + (intentos + 1) + ")");
                                 hayPendientes = true;
                             } catch (Exception e) {
-                                e.printStackTrace();
                             }
                         } else {
-                            System.out.println("❌ Parcela " + id + " ha superado el número máximo de reintentos.");
+                            System.out.println("❌ Parcela " + id + " ha superado reintentos.");
                             pendientes.remove(id);
                             respuestasRestantes.decrementAndGet();
                         }
                     }
                     if (respuestasRestantes.get() == 0) {
                         synchronized (lock) {
-                            lock.notify();
+                            lock.notifyAll();
                         }
                     } else if (hayPendientes) {
                         timeoutFuture[0] = scheduler.schedule(this, 120, TimeUnit.SECONDS);
@@ -123,14 +146,14 @@ public class Publisher {
             channel.basicConsume(nombreColaRespuestas, false, new DefaultConsumer(channel) {
                 @Override
                 public void handleDelivery(String consumerTag, Envelope envelope,
-                                        AMQP.BasicProperties properties, byte[] body) throws IOException {
+                                           AMQP.BasicProperties properties, byte[] body) throws IOException {
                     String response = new String(body, StandardCharsets.UTF_8);
                     System.out.println(" [x] Respuesta recibida: " + response);
 
                     timeoutFuture[0].cancel(false);
                     timeoutFuture[0] = scheduler.schedule(timeoutTask, 120, TimeUnit.SECONDS);
 
-                    try (java.sql.Connection dbConn = DriverManager.getConnection(DB_URL, DB_USER, dbPassword)) {
+                    try (java.sql.Connection dbConn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                         String[] partes = response.split(":");
                         if (partes.length == 2) {
                             String id = partes[0].trim();
@@ -138,22 +161,22 @@ public class Publisher {
 
                             Parcela parcela = pendientes.get(id);
                             if (parcela == null) {
-                                System.out.println("⚠️ Parcela " + id + " no está registrada como pendiente. Ignorando respuesta duplicada.");
+                                System.out.println("⚠️ Respuesta duplicada de " + id);
                                 channel.basicAck(envelope.getDeliveryTag(), false);
                                 return;
                             }
 
                             if (consumo > 30 || consumo < 0) {
-                                System.out.println("⚠️ Valor anómalo detectado en parcela " + id);
+                                System.out.println("⚠️ Consumo anómalo en " + id);
                                 int intentos = intentosPorParcela.getOrDefault(id, 0);
                                 if (intentos < MAX_REINTENTOS) {
                                     String routingKey = idToRoutingKey.getOrDefault(id, "subscriber1");
                                     byte[] mensaje = serialize(List.of(parcela));
                                     channel.basicPublish(EXCHANGE_NAME, routingKey, null, mensaje);
                                     intentosPorParcela.put(id, intentos + 1);
-                                    System.out.println("🔁 Parcela " + id + " reenviada para nuevo cálculo (intento " + (intentos + 1) + ")");
+                                    System.out.println("🔁 Parcela " + id + " reenviada (" + (intentos + 1) + ")");
                                 } else {
-                                    System.out.println("❌ Parcela " + id + " ha superado el número máximo de reintentos.");
+                                    System.out.println("❌ Parcela " + id + " superó reintentos.");
                                     pendientes.remove(id);
                                     respuestasRestantes.decrementAndGet();
                                 }
@@ -168,7 +191,7 @@ public class Publisher {
                                 stmt.executeUpdate();
                             }
 
-                            if (consumo > 23.5) {
+                            if (consumo > 26.5) {
                                 String userRoutingKey = "alerta." + parcela.getUsuarioId();
                                 channel.basicPublish(POST_ANALYSIS_EXCHANGE, userRoutingKey, null, response.getBytes());
                                 String mensajeConUsuario = response + ":" + parcela.getUsuarioId();
@@ -181,16 +204,15 @@ public class Publisher {
 
                             if (respuestasRestantes.get() == 0) {
                                 synchronized (lock) {
-                                    lock.notify();
+                                    lock.notifyAll();
                                 }
                             }
 
                         } else {
-                            System.out.println("Formato incorrecto en la respuesta: " + response);
+                            System.out.println("⚠️ Respuesta con formato incorrecto: " + response);
                         }
 
                     } catch (Exception e) {
-                        e.printStackTrace();
                     }
                 }
             });
@@ -213,21 +235,18 @@ public class Publisher {
             scheduler.shutdownNow();
 
             if (respuestasRestantes.get() > 0) {
-                System.out.println("⚠️ No se completaron todas las respuestas. Quedaron pendientes: " + respuestasRestantes.get());
+                System.out.println("⚠️ Quedaron respuestas pendientes: " + respuestasRestantes.get());
             } else {
-                System.out.println("✅ Todas las respuestas recibidas y almacenadas.");
+                System.out.println("✅ Todas las respuestas recibidas y procesadas.");
             }
 
-            System.out.println(" [x] Finalizando.");
-
         } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
     public static List<Parcela> cargarParcelasDesdeDB() {
         List<Parcela> parcelas = new ArrayList<>();
-        try (java.sql.Connection conn = DriverManager.getConnection(DB_URL, DB_USER, dbPassword);
+        try (java.sql.Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT * FROM Parcela")) {
 
@@ -245,11 +264,9 @@ public class Publisher {
                         rs.getDouble("humedadSuelo"),
                         rs.getInt("diaDelAnio")
                 ));
-                
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
         }
         return parcelas;
     }
@@ -274,16 +291,6 @@ public class Publisher {
     }
 
     public static void main(String[] args) throws Exception {
-        InputStream input = Publisher.class.getResourceAsStream("/config.txt");
-
-        Properties config = new Properties();
-        config.load(input);
-        dbPassword = config.getProperty("password");
-        int numSubscribers = 1;
-        String host = "localhost";
-        String username = "testuser";
-        String password = "testpassword";
-
-        new Publisher().enviarParcelas(numSubscribers, host, username, password);
+        new Publisher().enviarParcelas(1);
     }
 }

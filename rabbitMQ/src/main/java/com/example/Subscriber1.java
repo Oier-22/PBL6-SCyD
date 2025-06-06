@@ -2,7 +2,6 @@ package com.example;
 
 import com.example.paralelizacion.PrediccionExecutor;
 import com.rabbitmq.client.*;
-import com.rabbitmq.client.Connection;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -16,36 +15,48 @@ public class Subscriber1 {
     private static final String EXCHANGE_NAME = "parcelas_direct";
     private static final String RESPONSE_EXCHANGE_NAME = "parcelas_response";
 
-    private String host;
-    private String username;
-    private String password;
+    private static final String RABBIT_HOST;
+    private static final String RABBIT_USER;
+    private static final String RABBIT_PASS;
+    private static final int RABBIT_PORT;
+    private static final String TRUSTSTORE_PATH;
+    private static final char[] TRUSTSTORE_PASSWORD;
 
-    public Subscriber1(String host, String username, String password) {
-        this.host = host;
-        this.username = username;
-        this.password = password;
+    static {
+        Properties config = new Properties();
+        try (InputStream input = new FileInputStream("rabbitMQ/config/config.txt")) {
+            config.load(input);
+        } catch (IOException e) {
+            throw new RuntimeException("No se pudo cargar config.txt", e);
+        }
+
+        RABBIT_HOST = config.getProperty("rabbitmq.host");
+        RABBIT_USER = config.getProperty("rabbitmq.username");
+        RABBIT_PASS = config.getProperty("rabbitmq.password");
+        RABBIT_PORT = Integer.parseInt(config.getProperty("rabbitmq.port"));
+        TRUSTSTORE_PATH = config.getProperty("truststore.path");
+        TRUSTSTORE_PASSWORD = config.getProperty("truststore.password").toCharArray();
     }
 
-    public void recibirParcelas(String routingKey) throws TimeoutException {
+    public void recibirParcelas(String routingKey) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost(host);
-        factory.setUsername(username);
-        factory.setPassword(password);
+        factory.setHost(RABBIT_HOST);
+        factory.setUsername(RABBIT_USER);
+        factory.setPassword(RABBIT_PASS);
 
         try {
             // 🔐 Configurar conexión TLS
-            char[] truststorePassword = "changeit".toCharArray();
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            InputStream tsStream = Subscriber1.class.getClassLoader().getResourceAsStream("tls/truststore.jks");
-            trustStore.load(tsStream, truststorePassword);
-            
+            InputStream tsStream = new FileInputStream(TRUSTSTORE_PATH);
+            trustStore.load(tsStream, TRUSTSTORE_PASSWORD);
+
             TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
             tmf.init(trustStore);
 
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, tmf.getTrustManagers(), null);
 
-            factory.setPort(5671); // Puerto TLS
+            factory.setPort(RABBIT_PORT);
             factory.useSslProtocol(sslContext);
 
             try (Connection connection = factory.newConnection();
@@ -70,6 +81,7 @@ public class Subscriber1 {
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
+            throw e;
         } catch (Exception e) {
             System.err.println("❌ Error en la conexión TLS o configuración del TrustStore");
             e.printStackTrace();
@@ -165,13 +177,8 @@ public class Subscriber1 {
         }
     }
 
-    public static void main(String[] args) throws TimeoutException {
+    public static void main(String[] args) throws Exception {
         String routingKey = "subscriber1";
-        String host = "localhost";
-        String username = "testuser";
-        String password = "testpassword";
-
-        Subscriber1 subscriber = new Subscriber1(host, username, password);
-        subscriber.recibirParcelas(routingKey);
+        new Subscriber1().recibirParcelas(routingKey);
     }
 }

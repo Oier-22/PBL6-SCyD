@@ -5,26 +5,34 @@ import java.util.Properties;
 
 public class PrediccionUtils {
 
+    private static final String SCRIPT_PATH;
+
+    static {
+        Properties config = new Properties();
+        try (InputStream input = new FileInputStream("rabbitMQ/config/config.txt")) {
+            config.load(input);
+        } catch (IOException e) {
+            throw new RuntimeException("❌ No se pudo cargar config.txt", e);
+        }
+
+        SCRIPT_PATH = config.getProperty("scriptPath");
+        if (SCRIPT_PATH == null || SCRIPT_PATH.isBlank()) {
+            throw new RuntimeException("❌ 'scriptPath' no definido en config.txt");
+        }
+    }
+
     private PrediccionUtils() {
-        
+        // Clase utilitaria, no instanciable
     }
 
     public static double predecirConsumoIA(String jsonData) throws IOException {
         File tempFile = File.createTempFile("pred_input_", ".json");
-        InputStream input = PrediccionUtils.class.getResourceAsStream("/config.txt");
-        if (input == null) {
-            throw new FileNotFoundException("Archivo config.txt no encontrado en resources");
-        }
-        Properties config = new Properties();
-        config.load(input);
-        String scriptPath = config.getProperty("scriptPath");
-        
 
         try (FileWriter writer = new FileWriter(tempFile)) {
-            writer.write(jsonData);  
+            writer.write(jsonData);
         }
 
-        ProcessBuilder pb = new ProcessBuilder("python", scriptPath, tempFile.getAbsolutePath());
+        ProcessBuilder pb = new ProcessBuilder("python", SCRIPT_PATH, tempFile.getAbsolutePath());
         pb.redirectErrorStream(true);
         Process process = pb.start();
 
