@@ -52,7 +52,7 @@ public class AlertaWorker {
             channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.TOPIC);
             String queue = channel.queueDeclare().getQueue();
     
-            String usuarioId = "1"; // ← Cambia esto según el usuario
+            String usuarioId = "1";
             String routingKey = "alerta." + usuarioId;
             channel.queueBind(queue, EXCHANGE, routingKey);
     

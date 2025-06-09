@@ -9,7 +9,6 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
 import java.security.KeyStore;
 import java.util.*;
-import java.util.concurrent.TimeoutException;
 
 public class Subscriber1 {
     private static final String EXCHANGE_NAME = "parcelas_direct";

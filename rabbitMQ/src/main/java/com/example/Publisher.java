@@ -59,7 +59,7 @@ public class Publisher {
 
     public void enviarParcelas(int numSubscribers)
         throws TimeoutException, InterruptedException, KeyStoreException, NoSuchAlgorithmException,
-               CertificateException, IOException, KeyManagementException {
+               CertificateException, IOException, KeyManagementException, SQLException {
 
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(RABBIT_HOST);
@@ -240,11 +240,10 @@ public class Publisher {
                 System.out.println("✅ Todas las respuestas recibidas y procesadas.");
             }
 
-        } catch (IOException e) {
         }
     }
 
-    public static List<Parcela> cargarParcelasDesdeDB() {
+    public static List<Parcela> cargarParcelasDesdeDB() throws SQLException {
         List<Parcela> parcelas = new ArrayList<>();
         try (java.sql.Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
              Statement stmt = conn.createStatement();
@@ -266,7 +265,6 @@ public class Publisher {
                 ));
             }
 
-        } catch (SQLException e) {
         }
         return parcelas;
     }

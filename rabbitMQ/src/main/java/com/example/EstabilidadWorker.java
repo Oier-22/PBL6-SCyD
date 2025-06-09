@@ -61,7 +61,6 @@ public class EstabilidadWorker {
 
                 if (partes.length == 3) {
                     String id = partes[0].trim();
-                    String consumo = partes[1].trim();
                     String usuarioId = partes[2].trim();
 
                     System.out.println(" [Estabilidad] Analizando parcela " + id + " para usuario " + usuarioId + "...");
@@ -86,7 +85,7 @@ public class EstabilidadWorker {
             };
 
             channel.basicConsume(queue, false, callback, consumerTag -> {});
-            Thread.sleep(Long.MAX_VALUE); // Mantener vivo el hilo
+            Thread.sleep(Long.MAX_VALUE);
         }
     }
 }

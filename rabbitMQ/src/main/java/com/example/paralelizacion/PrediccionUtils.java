@@ -22,7 +22,7 @@ public class PrediccionUtils {
     }
 
     private PrediccionUtils() {
-        // Clase utilitaria, no instanciable
+        
     }
 
     public static double predecirConsumoIA(String jsonData) throws IOException {
