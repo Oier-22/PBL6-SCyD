@@ -69,7 +69,7 @@ public class EstabilidadWorker {
                         Thread.sleep(10000);
 
                         String resultado = id + ": plan para ajustar";
-                        String userRoutingKey = "alerta." + usuarioId;
+                        String userRoutingKey = "estabilidad." + usuarioId;
 
                         channel.basicPublish(EXCHANGE, userRoutingKey, null, resultado.getBytes(StandardCharsets.UTF_8));
                         System.out.println(" [Estabilidad] Resultado enviado a " + userRoutingKey);

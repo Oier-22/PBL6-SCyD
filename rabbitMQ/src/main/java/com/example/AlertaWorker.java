@@ -19,56 +19,62 @@ public class AlertaWorker {
         try (InputStream input = new FileInputStream("rabbitMQ/config/config.txt")) {
             config.load(input);
         }
-    
+
         String host = config.getProperty("rabbitmq.host");
         String username = config.getProperty("rabbitmq.username");
         String password = config.getProperty("rabbitmq.password");
         int port = Integer.parseInt(config.getProperty("rabbitmq.port"));
         String truststorePath = config.getProperty("truststore.path");
         char[] truststorePassword = config.getProperty("truststore.password").toCharArray();
-    
+
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(host);
         factory.setUsername(username);
         factory.setPassword(password);
-    
+
         KeyStore trustStore = KeyStore.getInstance("JKS");
         try (InputStream tsStream = new FileInputStream(truststorePath)) {
             trustStore.load(tsStream, truststorePassword);
         }
-    
+
         TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
         tmf.init(trustStore);
-    
+
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, tmf.getTrustManagers(), null);
-    
+
         factory.setPort(port);
         factory.useSslProtocol(sslContext);
-    
+
         try (Connection connection = factory.newConnection();
              Channel channel = connection.createChannel()) {
-    
+
             channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.TOPIC);
             String queue = channel.queueDeclare().getQueue();
-    
+
             String usuarioId = "1";
-            String routingKey = "alerta." + usuarioId;
-            channel.queueBind(queue, EXCHANGE, routingKey);
-    
-            System.out.println(" [*] Escuchando alertas para usuario: " + usuarioId);
-    
+            String alertaKey = "alerta." + usuarioId;
+            String estabilidadKey = "estabilidad." + usuarioId;
+
+            channel.queueBind(queue, EXCHANGE, alertaKey);
+            channel.queueBind(queue, EXCHANGE, estabilidadKey);
+
+            System.out.println(" [*] Escuchando mensajes para usuario: " + usuarioId);
+
             DeliverCallback callback = (consumerTag, delivery) -> {
                 String mensaje = new String(delivery.getBody(), StandardCharsets.UTF_8);
                 String receivedRoutingKey = delivery.getEnvelope().getRoutingKey();
-    
-                System.out.println(" [ALERTA] (" + receivedRoutingKey + ") " + mensaje);
-    
+
+                String tipo = receivedRoutingKey.startsWith("alerta.") ? "⚠️ Alerta" :
+                              receivedRoutingKey.startsWith("estabilidad.") ? "📊 Estabilidad" : "📦 Otro";
+
+                System.out.println(" [" + tipo + "] parcela " + mensaje);
+
                 channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
             };
-    
+
             channel.basicConsume(queue, false, callback, consumerTag -> {});
             Thread.sleep(Long.MAX_VALUE);
         }
-    }    
+    }
 }
