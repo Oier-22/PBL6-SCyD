@@ -6,6 +6,7 @@ import com.rabbitmq.client.Connection;
 import java.io.*;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -88,11 +89,10 @@ public class Publisher {
 
             List<Parcela> parcelas = cargarParcelasDesdeDB();
             List<List<Parcela>> grupos = dividirParcelas(parcelas, numSubscribers);
-
-            Map<String, Parcela> pendientes = new HashMap<>();
-            Map<String, String> idToRoutingKey = new HashMap<>();
-            Map<String, Integer> intentosPorParcela = new HashMap<>();
             final int MAX_REINTENTOS = 3;
+            Map<String, Parcela> pendientes = new ConcurrentHashMap<>();
+            Map<String, String> idToRoutingKey = new ConcurrentHashMap<>();
+            Map<String, Integer> intentosPorParcela = new ConcurrentHashMap<>();            
 
             for (Parcela p : parcelas) {
                 pendientes.put(p.getId(), p);
